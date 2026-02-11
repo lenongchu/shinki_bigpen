@@ -364,15 +364,22 @@ class DrawingOverlay(QWidget):
     
     def mousePressEvent(self, event):
         """鼠标按下事件"""
-        # 只在笔模式下绘制
-        if self.mode == 'pen' and event.button() == Qt.LeftButton:
-            print(f"[Gink] mousePressEvent: start drawing at {event.pos()}, mode={self.mode}")
+        if self.mode != 'pen':
+            event.ignore()
+            return
+        if event.button() == Qt.LeftButton:
             self.drawing = True
             self.last_point = event.pos()
             self.current_path = [(event.pos(), self.pen_color, self.pen_width)]
             event.accept()
+        elif event.button() == Qt.RightButton:
+            # 右键：在点击位置生成当前笔色的圆点
+            radius = max(4, self.pen_width * 2)
+            dot_path = [(event.pos(), self.pen_color, radius)]  # 单点表示圆点，第三项为半径
+            self.paths.append(dot_path)
+            self.update()
+            event.accept()
         else:
-            print(f"[Gink] mousePressEvent: ignored, mode={self.mode}, button={event.button()}")
             event.ignore()
     
     def mouseMoveEvent(self, event):
@@ -412,17 +419,23 @@ class DrawingOverlay(QWidget):
             painter.setBrush(QBrush(QColor(0, 150, 255, 3)))  # alpha≈3，约 99% 透明
             painter.drawRect(self.activation_zone)
         
-        # 绘制所有路径
+        # 绘制所有路径（包括圆点）
         for path in self.paths:
-            if len(path) < 2:
-                continue
-            points = [p[0] for p in path]
-            color = path[0][1]
-            width = path[0][2]
-            
-            painter.setPen(QPen(color, width, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
-            for i in range(len(points) - 1):
-                painter.drawLine(points[i], points[i + 1])
+            if len(path) == 1:
+                # 单点表示右键生成的圆点：(pos, color, radius)
+                pt, color, radius = path[0]
+                painter.setPen(Qt.NoPen)
+                painter.setBrush(QBrush(color))
+                rect = QRect(pt.x() - radius, pt.y() - radius, radius * 2, radius * 2)
+                painter.drawEllipse(rect)
+            elif len(path) >= 2:
+                points = [p[0] for p in path]
+                color = path[0][1]
+                width = path[0][2]
+                painter.setPen(QPen(color, width, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+                painter.setBrush(Qt.NoBrush)
+                for i in range(len(points) - 1):
+                    painter.drawLine(points[i], points[i + 1])
         
         # 绘制当前路径
         if self.current_path and len(self.current_path) >= 2:

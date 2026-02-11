@@ -1,11 +1,6 @@
 {
-  "clear_all": "Ctrl+Alt+C",
-  "undo": "Ctrl+Alt+Z",
-  "show_zone_setup": "Ctrl+Alt+S",
-  "activation_zone": {
-    "x": 2158,
-    "y": 92,
-    "width": 1429,
-    "height": 646
-  }
+  "clear_all": ",",
+  "undo": ".",
+  "show_zone_setup": "/",
+  "click_through_modifier": "alt"
 }

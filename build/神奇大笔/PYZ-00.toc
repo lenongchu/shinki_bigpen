@@ -1,5 +1,5 @@
-('D:\\OneDrive - City University of Hong Kong - '
- 'Student\\Cursor\\Test\\build\\神奇大笔\\PYZ-00.pyz',
+('D:\\OneDrive - City University of Hong Kong - Student\\Cursor\\Shinki '
+ 'Bigpen\\build\\神奇大笔\\PYZ-00.pyz',
  [('PyQt5',
    'D:\\Python 3.11\\Lib\\site-packages\\PyQt5\\__init__.py',
    'PYMODULE'),
