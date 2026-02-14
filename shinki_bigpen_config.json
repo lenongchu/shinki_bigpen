@@ -2,5 +2,11 @@
   "clear_all": ",",
   "undo": ".",
   "show_zone_setup": "/",
+  "pinned_magic_zone": {
+    "x": 2352,
+    "y": 103,
+    "width": 1078,
+    "height": 670
+  },
   "click_through_modifier": "alt"
 }

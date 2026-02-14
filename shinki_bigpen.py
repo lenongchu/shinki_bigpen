@@ -684,10 +684,15 @@ class MainWindow(QWidget):
         # 创建菜单
         tray_menu = QMenu()
         
-        # 使用上次神奇区域
-        use_last_action = QAction("使用上次神奇区域", self)
-        use_last_action.triggered.connect(self.use_last_magic_zone)
-        tray_menu.addAction(use_last_action)
+        # 保存当前神奇区域（书签，关闭软件后仍可还原）
+        save_zone_action = QAction("保存当前神奇区域", self)
+        save_zone_action.triggered.connect(self.save_current_magic_zone)
+        tray_menu.addAction(save_zone_action)
+        
+        # 还原已保存的神奇区域
+        restore_zone_action = QAction("还原神奇区域", self)
+        restore_zone_action.triggered.connect(self.restore_pinned_magic_zone)
+        tray_menu.addAction(restore_zone_action)
         
         # 设置神奇区域
         zone_action = QAction("设置神奇区域", self)
@@ -771,9 +776,9 @@ class MainWindow(QWidget):
         QApplication.processEvents()
 
         # ----------------------
-        # 配置（快捷键 + 上次神奇区域 + 临时穿透修饰键）
+        # 配置（快捷键 + 上次神奇区域 + 临时穿透修饰键 + 已保存的书签区域）
         # ----------------------
-        self.shortcuts, self.saved_magic_zone, self.click_through_modifier = self._load_config()
+        self.shortcuts, self.saved_magic_zone, self.click_through_modifier, self.pinned_magic_zone = self._load_config()
         self.overlay.set_click_through_modifier(self.click_through_modifier)
         self._init_shortcuts()
 
@@ -789,9 +794,10 @@ class MainWindow(QWidget):
         }
 
     def _load_config(self):
-        """从配置文件加载快捷键、上次神奇区域、临时穿透修饰键"""
+        """从配置文件加载快捷键、上次神奇区域、临时穿透修饰键、已保存的书签区域"""
         shortcuts = self._default_shortcuts()
         saved_zone = None
+        pinned_zone = None
         click_through_modifier = Qt.AltModifier
         if os.path.exists(self.config_path):
             try:
@@ -806,20 +812,30 @@ class MainWindow(QWidget):
                             h = v.get("height", 0)
                             if w > 0 and h > 0:
                                 saved_zone = QRect(x, y, w, h)
+                        elif k == "pinned_magic_zone" and isinstance(v, dict):
+                            x = v.get("x", 0)
+                            y = v.get("y", 0)
+                            w = v.get("width", 0)
+                            h = v.get("height", 0)
+                            if w > 0 and h > 0:
+                                pinned_zone = QRect(x, y, w, h)
                         elif k == "click_through_modifier" and isinstance(v, str):
                             click_through_modifier = parse_click_through_modifier(v)
-                        elif k not in ("activation_zone", "click_through_modifier"):
+                        elif k not in ("activation_zone", "pinned_magic_zone", "click_through_modifier"):
                             shortcuts[k] = str(v)
             except Exception as e:
                 print(f"[Gink] 加载配置失败: {e}")
-        return shortcuts, saved_zone, click_through_modifier
+        return shortcuts, saved_zone, click_through_modifier, pinned_zone
 
     def _save_config(self):
-        """保存快捷键、神奇区域、临时穿透修饰键到配置文件"""
+        """保存快捷键、神奇区域、已保存书签区域、临时穿透修饰键到配置文件"""
         data = dict(self.shortcuts)
         zone = self.overlay.activation_zone or self.saved_magic_zone
         if zone:
             data["activation_zone"] = {"x": zone.x(), "y": zone.y(), "width": zone.width(), "height": zone.height()}
+        if getattr(self, "pinned_magic_zone", None):
+            p = self.pinned_magic_zone
+            data["pinned_magic_zone"] = {"x": p.x(), "y": p.y(), "width": p.width(), "height": p.height()}
         mod = getattr(self, "click_through_modifier", None) or self.overlay.click_through_modifier
         data["click_through_modifier"] = modifier_to_str(mod)
         try:
@@ -994,19 +1010,32 @@ class MainWindow(QWidget):
         self.saved_magic_zone = None
         self._save_config()
 
-    def use_last_magic_zone(self):
-        """使用上次保存的神奇区域，立即开始画画"""
-        if self.saved_magic_zone is None:
-            from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.information(self, "提示", "暂无上次神奇区域，请先设置神奇区域。")
+    def save_current_magic_zone(self):
+        """将当前神奇区域保存为书签，关闭软件后仍可还原"""
+        from PyQt5.QtWidgets import QMessageBox
+        zone = self.overlay.activation_zone or self.saved_magic_zone
+        if zone is None:
+            QMessageBox.information(self, "提示", "请先设置或使用一个神奇区域后再保存。")
+            return
+        self.pinned_magic_zone = QRect(zone)
+        self._save_config()
+        QMessageBox.information(self, "提示", "已保存当前神奇区域，可随时通过「还原神奇区域」恢复。")
+
+    def restore_pinned_magic_zone(self):
+        """还原已保存的神奇区域并立即使用"""
+        from PyQt5.QtWidgets import QMessageBox
+        if getattr(self, "pinned_magic_zone", None) is None:
+            QMessageBox.information(self, "提示", "尚未保存过神奇区域，请先使用「保存当前神奇区域」。")
             return
         if not self.overlay_visible:
             self.toggle_overlay()
-        self.overlay.set_activation_zone(self.saved_magic_zone)
+        self.overlay.set_activation_zone(self.pinned_magic_zone)
         self.overlay.toggle_zone_visibility(True)
         self.overlay.mode = 'pointer'
         self.overlay.setCursor(Qt.ArrowCursor)
         self.overlay.set_mouse_transparent(True)
+        self.saved_magic_zone = self.pinned_magic_zone
+        self._save_config()
     
     def choose_color(self):
         """选择笔颜色"""
